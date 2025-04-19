@@ -1,6 +1,5 @@
 import { Server as HTTPServer } from 'http';
 import { Server, Socket } from 'socket.io';
-import { v4 as uuidv4 } from 'uuid';
 import { Room, Player, PlayerRole, GameState, PlayerStatus } from '../types/game.js';
 
 // 存储所有游戏房间的信息

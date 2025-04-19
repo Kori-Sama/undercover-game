@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { Room, Player, PlayerRole } from "@/types/game";
+import { Room, PlayerRole } from "@/types/game";
 import { useSocket } from "@/context/SocketContext";
-import { useRouter } from "next/navigation";
 
 // Define props interface
 interface HostPageProps {
@@ -13,7 +12,6 @@ interface HostPageProps {
 
 export default function HostPage({ params: paramsPromise }: HostPageProps) {
     const params = use(paramsPromise);
-    const router = useRouter();
     const { socket, isConnected } = useSocket();
     const [room, setRoom] = useState<Room | null>(null);
     const [loading, setLoading] = useState(true);

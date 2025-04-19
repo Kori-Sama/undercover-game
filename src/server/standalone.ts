@@ -16,7 +16,8 @@ try {
 
 
     // 初始化Socket.io服务器
-    const io = initSocketServer(httpServer);
+    initSocketServer(httpServer);
+
 
     // 启动服务器
     const PORT = process.env.SOCKET_PORT || 3001;

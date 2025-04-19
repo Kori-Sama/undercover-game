@@ -158,7 +158,7 @@ export default function CreateRoom() {
                                 className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 dark:placeholder-gray-500"
                             />
                             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                请设置相似但不同的词，例如"苹果"和"梨"
+                                请设置相似但不同的词，例如苹果和梨
                             </p>
                         </div>
                     </div>

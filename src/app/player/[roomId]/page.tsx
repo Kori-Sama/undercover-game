@@ -92,7 +92,7 @@ export default function PlayerPage({ params: paramsPromise }: PlayerPageProps) {
         });
 
         // 监听猜词结果
-        socket.on('guess_result', ({ playerId, correct, word, gameEnded, winner }) => {
+        socket.on('guess_result', ({ playerId, correct, gameEnded, winner }) => {
             if (playerId === socket.id) {
                 if (!correct) {
                     setIsEliminated(true);
