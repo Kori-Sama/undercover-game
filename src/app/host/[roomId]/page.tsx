@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { Room, PlayerRole } from "@/types/game";
+import { Room, PlayerRole, Player, GameState } from "@/types/game";
 import { useSocket } from "@/context/SocketContext";
 
 // Define props interface
@@ -17,6 +17,7 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
     const [loading, setLoading] = useState(true);
     const [roleAssignment, setRoleAssignment] = useState<Record<string, PlayerRole>>({});
     const [error, setError] = useState<string | null>(null);
+    const [voteCounts, setVoteCounts] = useState<Record<string, number>>({});
 
     // 连接到WebSocket服务器并获取房间信息
     useEffect(() => {
@@ -27,6 +28,20 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
             if (updatedRoom.roomId === params.roomId) {
                 setRoom(updatedRoom);
                 setLoading(false);
+
+                if (updatedRoom.state !== "voting") {
+                    setVoteCounts({});
+                }
+
+                if (updatedRoom.state === "voting") {
+                    const counts: Record<string, number> = {};
+                    updatedRoom.players.forEach((player: Player) => {
+                        if (player.vote && player.status === "alive") {
+                            counts[player.vote] = (counts[player.vote] || 0) + 1;
+                        }
+                    });
+                    setVoteCounts(counts);
+                }
             }
         });
 
@@ -34,6 +49,7 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
         socket.on('voting_started', (updatedRoom) => {
             if (updatedRoom.roomId === params.roomId) {
                 setRoom(updatedRoom);
+                setVoteCounts({});
             }
         });
 
@@ -44,10 +60,13 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
 
         // 监听投票结果事件
         socket.on('voting_result', (result) => {
-            // 处理投票结果更新UI
-            // 通常服务器会在发送此事件后发送 room_updated，所以UI会自动更新
-            // 可以选择性地显示一个提示
+            if (result.voteCounts) {
+                setVoteCounts(result.voteCounts);
+            }
+
             const eliminatedPlayer = room?.players.find(p => p.id === result.eliminated);
+            console.log('投票结果:', result);
+            console.log('被淘汰的玩家:', eliminatedPlayer);
             const message = result.eliminatedPlayerId
                 ? `${eliminatedPlayer?.name || '一名玩家'} 被投票淘汰。`
                 : '平票或无人被淘汰。';
@@ -55,6 +74,22 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
             if (result.eliminatedPlayerId && result.canGuess) {
                 alert(`${eliminatedPlayer?.name} 是 ${result.eliminatedPlayerRole}，现在可以猜词。`);
             }
+
+            setRoom((prev: Room | null) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    players: prev.players.map((player) => {
+                        if (player.id === result.eliminatedPlayerId) {
+                            return { ...player, status: "eliminated" };
+                        }
+                        return player;
+                    }),
+                    state: (result.gameEnded ? "ended" : "playing") as GameState,
+                    winner: result.winner,
+
+                }
+            });
         });
 
         // 监听投票无效事件
@@ -62,23 +97,57 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
             alert('投票未达到半数或出现平票，投票无效，请重新投票。');
         });
 
+        // 监听玩家投票事件
+        socket.on('player_voted', ({ targetId }) => {
+            setVoteCounts(prev => ({
+                ...prev,
+                [targetId]: (prev[targetId] || 0) + 1
+            }));
+        });
+
         // 监听猜词结果
         socket.on('guess_result', (result) => {
-            // 处理猜词结果
             const guesser = room?.players.find(p => p.id === result.playerId);
             const message = result.correct
                 ? `${guesser?.name || '玩家'} 猜对了!`
                 : `${guesser?.name || '玩家'} 猜错了。`;
             alert(`猜词结果: ${message}`);
-            // 游戏状态通常会通过 room_updated 更新
+
+            setRoom((prev: Room | null) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    players: prev.players.map((player) => {
+                        if (player.id === result.playerId) {
+                            return { ...player, status: "eliminated" };
+                        }
+                        return player;
+                    }),
+                    state: (result.gameEnded ? "ended" : "playing") as GameState,
+                    winner: result.winner,
+                }
+            });
         });
 
         // 监听玩家被淘汰
         socket.on('player_eliminated', (data) => {
-            // 处理玩家被淘汰
-            // UI 会通过 room_updated 更新，这里可以加个提示
             const eliminatedPlayer = room?.players.find(p => p.id === data.playerId);
             alert(`${eliminatedPlayer?.name || '一名玩家'} 已被淘汰。`);
+
+            setRoom((prev: Room | null) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    players: prev.players.map((player) => {
+                        if (player.id === data.playerId) {
+                            return { ...player, status: "eliminated" };
+                        }
+                        return player;
+                    }),
+                    state: (data.gameEnded ? "ended" : "playing") as GameState,
+                    winner: data.winner,
+                }
+            });
         });
 
         // 监听玩家离开
@@ -95,18 +164,15 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
             setError(err.message);
         });
 
-        // 获取初始房间数据
-        // 对于主持人，我们可以通过发送事件来获取或重新刷新
-        // 在实际应用中，这里可能需要服务器端验证
         socket.emit('get_room', { roomId: params.roomId });
 
         return () => {
-            // 清理事件监听
             socket.off('room_updated');
             socket.off('voting_started');
             socket.off('all_voted');
             socket.off('voting_result');
             socket.off('voting_invalid');
+            socket.off('player_voted');
             socket.off('guess_result');
             socket.off('player_eliminated');
             socket.off('player_left');
@@ -114,14 +180,12 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
         };
     }, [socket, isConnected, params.roomId]);
 
-    // 随机分配角色
     const assignRolesRandomly = () => {
         if (!room || !socket) return;
 
         socket.emit('start_game', { roomId: params.roomId });
     };
 
-    // 手动分配角色
     const assignRole = (playerId: string, role: PlayerRole) => {
         setRoleAssignment((prev) => ({
             ...prev,
@@ -129,11 +193,9 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
         }));
     };
 
-    // 保存手动分配的角色
     const saveRoleAssignments = () => {
         if (!room || !socket) return;
 
-        // 计算各角色数量
         let goodAssigned = 0;
         let evilAssigned = 0;
         let blankAssigned = 0;
@@ -144,7 +206,6 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
             else if (role === "blank") blankAssigned++;
         });
 
-        // 检查是否符合设置的数量
         if (goodAssigned !== room.goodCount ||
             evilAssigned !== room.evilCount ||
             blankAssigned !== room.blankCount) {
@@ -152,33 +213,39 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
             return;
         }
 
-        // 发送开始游戏事件，带有手动角色分配
         socket.emit('start_game', {
             roomId: params.roomId,
             playerRoles: roleAssignment
         });
     };
 
-    // 开启投票
     const startVoting = () => {
         if (!room || !socket) return;
 
         socket.emit('start_voting', { roomId: params.roomId });
     };
 
-    // 结束投票
     const endVoting = () => {
         if (!room || !socket) return;
 
         socket.emit('end_voting', { roomId: params.roomId });
     };
 
-    // 重新开始游戏
     const restartGame = () => {
         if (!room || !socket) return;
 
         socket.emit('restart_game', { roomId: params.roomId });
         setRoleAssignment({});
+        setVoteCounts({});
+        setRoom((prev: Room | null) => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                players: prev.players.map((player) => ({ ...player, status: "alive" })),
+                state: "waiting",
+                winner: undefined,
+            };
+        });
     };
 
     if (!isConnected) {
@@ -217,7 +284,6 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
                 </div>
             </div>
 
-            {/* 玩家列表 */}
             <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-3">玩家列表</h2>
 
@@ -242,9 +308,13 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
                                                 ({player.role === "good" ? "好人" : player.role === "evil" ? "坏人" : "白板"})
                                             </span>
                                         )}
+                                        {room.state === "voting" && (
+                                            <span className="ml-2 text-sm bg-yellow-100 dark:bg-yellow-800 rounded px-2 py-0.5 text-yellow-800 dark:text-yellow-200">
+                                                {voteCounts[player.id] || 0} 票
+                                            </span>
+                                        )}
                                     </div>
 
-                                    {/* 在等待阶段可以分配角色 */}
                                     {room.state === "waiting" && (
                                         <select
                                             value={roleAssignment[player.id] || ""}
@@ -264,7 +334,6 @@ export default function HostPage({ params: paramsPromise }: HostPageProps) {
                 )}
             </div>
 
-            {/* 游戏控制 */}
             <div className="space-y-3">
                 {room.state === "waiting" && (
                     <>

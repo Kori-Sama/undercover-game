@@ -73,6 +73,15 @@ export default function PlayerPage({ params: paramsPromise }: PlayerPageProps) {
                 setIsEliminated(true);
             }
 
+            // 更新玩家列表中的状态
+            setPlayers(prevPlayers =>
+                prevPlayers.map(player =>
+                    player.id === eliminated
+                        ? { ...player, status: "eliminated" }
+                        : player
+                )
+            );
+
             // 重置投票
             setVotedFor(undefined);
 
@@ -99,6 +108,15 @@ export default function PlayerPage({ params: paramsPromise }: PlayerPageProps) {
                 }
             }
 
+            // 更新玩家列表中的状态
+            setPlayers(prevPlayers =>
+                prevPlayers.map(player =>
+                    player.id === playerId && !correct
+                        ? { ...player, status: "eliminated" }
+                        : player
+                )
+            );
+
             if (gameEnded) {
                 setGameState("ended");
                 setWinner(winner);
@@ -110,6 +128,15 @@ export default function PlayerPage({ params: paramsPromise }: PlayerPageProps) {
             if (playerId === socket.id) {
                 setIsEliminated(true);
             }
+
+            // 更新玩家列表中的状态
+            setPlayers(prevPlayers =>
+                prevPlayers.map(player =>
+                    player.id === playerId
+                        ? { ...player, status: "eliminated" }
+                        : player
+                )
+            );
 
             if (gameEnded) {
                 setGameState("ended");

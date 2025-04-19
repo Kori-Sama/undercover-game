@@ -12,6 +12,7 @@ services:
     environment:
       - NODE_ENV=production
       - SOCKET_URL=http://backend:3001  # Connect to backend service
+      - NEXT_PUBLIC_SOCKET_URL=http://47.120.24.209:3001
     volumes:
       - frontend-data:/app/data
     networks:

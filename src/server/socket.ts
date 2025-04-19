@@ -316,10 +316,26 @@ export default function initSocketServer(httpServer: HTTPServer) {
                 // 通知所有玩家投票结果
                 io.to(roomId).emit('voting_result', {
                     eliminated: eliminatedPlayerId,
+                    eliminatedPlayerRole: updatedPlayers.find(p => p.id === eliminatedPlayerId)?.role,
+                    canGuess: !gameEnded,
                     gameEnded,
                     winner,
                     voteCounts: votes
                 });
+
+                // 向所有玩家发送更新后的房间信息
+                io.to(room.host).emit('room_updated', updatedRoom);
+
+                // 向普通玩家发送不含角色和词的房间信息
+                const sanitizedRoom = {
+                    ...updatedRoom,
+                    players: updatedPlayers.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        status: p.status
+                    }))
+                };
+                socket.to(roomId).emit('room_updated', sanitizedRoom);
 
                 console.log(`房间 ${roomId} 投票结束，玩家 ${eliminatedPlayerId} 被淘汰`);
             } else {
@@ -330,6 +346,20 @@ export default function initSocketServer(httpServer: HTTPServer) {
                     state: "playing" as GameState
                 };
                 rooms.set(roomId, updatedRoom);
+
+                // 向所有玩家发送更新后的房间信息
+                io.to(room.host).emit('room_updated', updatedRoom);
+
+                // 向普通玩家发送不含角色和词的房间信息
+                const sanitizedRoom = {
+                    ...updatedRoom,
+                    players: playersWithoutVotes.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        status: p.status
+                    }))
+                };
+                socket.to(roomId).emit('room_updated', sanitizedRoom);
 
                 // 通知所有玩家投票无效
                 io.to(roomId).emit('voting_invalid');

@@ -184,6 +184,7 @@ export default function initSocketServer(httpServer) {
         });
         // 结束投票
         socket.on('end_voting', ({ roomId }) => {
+            var _a;
             const room = rooms.get(roomId);
             if (!room || room.host !== socket.id) {
                 socket.emit('error', { message: '无权操作或房间不存在' });
@@ -226,16 +227,36 @@ export default function initSocketServer(httpServer) {
                 // 通知所有玩家投票结果
                 io.to(roomId).emit('voting_result', {
                     eliminated: eliminatedPlayerId,
+                    eliminatedPlayerRole: (_a = updatedPlayers.find(p => p.id === eliminatedPlayerId)) === null || _a === void 0 ? void 0 : _a.role,
+                    canGuess: !gameEnded,
                     gameEnded,
                     winner,
                     voteCounts: votes
                 });
+                // 向所有玩家发送更新后的房间信息
+                io.to(room.host).emit('room_updated', updatedRoom);
+                // 向普通玩家发送不含角色和词的房间信息
+                const sanitizedRoom = Object.assign(Object.assign({}, updatedRoom), { players: updatedPlayers.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        status: p.status
+                    })) });
+                socket.to(roomId).emit('room_updated', sanitizedRoom);
                 console.log(`房间 ${roomId} 投票结束，玩家 ${eliminatedPlayerId} 被淘汰`);
             }
             else {
                 // 未达到半数，重新开始
                 const updatedRoom = Object.assign(Object.assign({}, room), { players: playersWithoutVotes, state: "playing" });
                 rooms.set(roomId, updatedRoom);
+                // 向所有玩家发送更新后的房间信息
+                io.to(room.host).emit('room_updated', updatedRoom);
+                // 向普通玩家发送不含角色和词的房间信息
+                const sanitizedRoom = Object.assign(Object.assign({}, updatedRoom), { players: playersWithoutVotes.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        status: p.status
+                    })) });
+                socket.to(roomId).emit('room_updated', sanitizedRoom);
                 // 通知所有玩家投票无效
                 io.to(roomId).emit('voting_invalid');
                 console.log(`房间 ${roomId} 投票无效，没有玩家被淘汰`);
