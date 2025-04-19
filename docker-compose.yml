@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: undercover-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"  # Next.js app
+      - "3001:3001"  # Socket.io server
+    environment:
+      - NODE_ENV=production
+      # You can add additional environment variables here
+      # - VARIABLE=value
+    volumes:
+      # For persisting data if needed
+      - app-data:/app/data
+    networks:
+      - app-network
+
+volumes:
+  app-data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

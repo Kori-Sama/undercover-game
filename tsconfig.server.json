@@ -1,0 +1,19 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "module": "NodeNext", // Use NodeNext for ES Module support in Node.js
+        "moduleResolution": "NodeNext", // Use NodeNext module resolution
+        "outDir": "./dist", // Output directory for compiled JS
+        "noEmit": false, // Allow emitting JS files
+        "isolatedModules": false // Not needed for server build
+    },
+    "include": [
+        "src/server/**/*.ts",
+    ], // Only include server files
+    "exclude": [
+        "node_modules",
+        "src/app",
+        "src/context",
+        "src/types"
+    ] // Exclude client-side code and types potentially duplicated
+}
