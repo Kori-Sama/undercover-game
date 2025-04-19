@@ -1,27 +1,44 @@
 version: '3.8'
 
 services:
-  app:
+  frontend:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: undercover-app
+      dockerfile: Dockerfile.frontend
+    container_name: undercover-frontend
     restart: unless-stopped
     ports:
       - "3000:3000"  # Next.js app
+    environment:
+      - NODE_ENV=production
+      - SOCKET_URL=http://backend:3001  # Connect to backend service
+    volumes:
+      - frontend-data:/app/data
+    networks:
+      - app-network
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: undercover-socket
+    restart: unless-stopped
+    ports:
       - "3001:3001"  # Socket.io server
     environment:
       - NODE_ENV=production
-      # You can add additional environment variables here
-      # - VARIABLE=value
+      - SOCKET_PORT=3001
     volumes:
-      # For persisting data if needed
-      - app-data:/app/data
+      - backend-data:/app/data
     networks:
       - app-network
 
 volumes:
-  app-data:
+  frontend-data:
+    driver: local
+  backend-data:
     driver: local
 
 networks:
