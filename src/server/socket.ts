@@ -4,18 +4,36 @@ import { Room, Player, PlayerRole, GameState, PlayerStatus } from '../types/game
 
 // 存储所有游戏房间的信息
 const rooms: Map<string, Room> = new Map();
+// 存储玩家的最后活跃时间
+const playerLastActive: Map<string, number> = new Map();
+// 心跳超时时间（毫秒）
+const HEARTBEAT_TIMEOUT = 30000; // 30秒
+// 心跳检查间隔
+const HEARTBEAT_INTERVAL = 25000; // 25秒
 
 export default function initSocketServer(httpServer: HTTPServer) {
     const io = new Server(httpServer, {
         cors: {
             origin: "*",
             methods: ["GET", "POST"]
-        }
+        },
+        pingTimeout: HEARTBEAT_TIMEOUT,
+        pingInterval: HEARTBEAT_INTERVAL
     });
 
     // 处理Socket.io连接
     io.on('connection', (socket: Socket) => {
         console.log(`用户已连接: ${socket.id}`);
+        // 记录玩家连接时间
+        playerLastActive.set(socket.id, Date.now());
+
+        // 处理心跳ping事件
+        socket.on('heartbeat', () => {
+            // 更新玩家最后活跃时间
+            playerLastActive.set(socket.id, Date.now());
+            // 回复pong
+            socket.emit('heartbeat_ack');
+        });
 
         // 获取房间信息
         socket.on('get_room', ({ roomId }: { roomId: string }) => {
